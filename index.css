@@ -1,0 +1,155 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #121212;
+  color: white;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #333;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: bold;
+  color: #f5a623;
+}
+
+.wallet-button {
+  background-color: #f5a623;
+  color: #121212;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.wallet-button:hover {
+  background-color: #f7b84b;
+}
+
+.dice-game {
+  background-color: #1e1e1e;
+  border-radius: 10px;
+  padding: 30px;
+  margin-bottom: 30px;
+}
+
+.game-title {
+  font-size: 24px;
+  margin-bottom: 20px;
+  color: #f5a623;
+}
+
+.bet-input {
+  margin-bottom: 20px;
+}
+
+.number-selector {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.dice-number {
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #333;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.dice-number.selected {
+  background-color: #f5a623;
+  color: #121212;
+}
+
+.roll-button {
+  background-color: #f5a623;
+  color: #121212;
+  border: none;
+  padding: 15px 30px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: 20px;
+}
+
+.roll-button:hover {
+  background-color: #f7b84b;
+}
+
+.roll-button:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+.game-result {
+  margin-top: 30px;
+  text-align: center;
+}
+
+.result-dice {
+  font-size: 60px;
+  margin-bottom: 20px;
+}
+
+.result-message {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.result-win {
+  color: #4caf50;
+}
+
+.result-lose {
+  color: #f44336;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.history-table th, .history-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #333;
+}
+
+.history-table th {
+  background-color: #1e1e1e;
+  color: #f5a623;
+}
+
+.win {
+  color: #4caf50;
+}
+
+.lose {
+  color: #f44336;
+}
