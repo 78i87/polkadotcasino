@@ -1,16 +1,17 @@
 import React from 'react';
-import { ethers } from 'ethers';
+import { formatWND } from '../utils/blockchain';
 
 function GameHistory({ history }) {
   // Format timestamp to readable date
   const formatDate = (timestamp) => {
-    return new Date(timestamp * 1000).toLocaleString();
+    const ts = timestamp && typeof timestamp.toNumber === 'function'
+      ? timestamp.toNumber()
+      : Number(timestamp);
+    return new Date(ts * 1000).toLocaleString();
   };
 
-  // Format ETH amount
-  const formatEth = (wei) => {
-    return parseFloat(ethers.utils.formatEther(wei)).toFixed(4);
-  };
+  // Format Westend (WND) amount
+  // uses formatWND imported above
 
   return (
     <div>
@@ -30,14 +31,14 @@ function GameHistory({ history }) {
           <tbody>
             {history.map((game, index) => (
               <tr key={index}>
-                <td>{formatDate(game.timestamp.toString())}</td>
-                <td>{formatEth(game.betAmount)} ETH</td>
-                <td>{game.chosenNumber.toString()}</td>
-                <td>{game.rolledNumber.toString()}</td>
-                <td className={game.payout.toString() !== '0' ? 'win' : 'lose'}>
-                  {game.payout.toString() !== '0' ? 'Win' : 'Lose'}
+                <td>{formatDate(game.timestamp)}</td>
+                <td>{formatWND(game.betAmount)} WND</td>
+                <td>{game.chosenNumber.toNumber()}</td>
+                <td>{game.rolledNumber.toNumber()}</td>
+                <td className={game.payout.toNumber() !== 0 ? 'win' : 'lose'}>
+                  {game.payout.toNumber() !== 0 ? 'Win' : 'Lose'}
                 </td>
-                <td>{formatEth(game.payout)} ETH</td>
+                <td>{formatWND(game.payout)} WND</td>
               </tr>
             ))}
           </tbody>

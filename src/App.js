@@ -1,75 +1,62 @@
-import React, { useState, useEffect } from 'react';
-import { ethers } from 'ethers';
-import Web3Modal from 'web3modal';
+import React, { useState } from 'react';
 import Header from './components/Header';
 import DiceGame from './components/DiceGame';
 import GameHistory from './components/GameHistory';
-import { connectWallet, getDiceGameContract } from './utils/blockchain';
+import {
+  connectWallet,
+  getDiceGameContract,
+  getPlayerHistory,
+  placeBet as sendBet
+} from './utils/blockchain';
 
 function App() {
-  const [provider, setProvider] = useState(null);
-  const [signer, setSigner] = useState(null);
   const [contract, setContract] = useState(null);
   const [account, setAccount] = useState('');
+  const [injector, setInjector] = useState(null);
   const [gameHistory, setGameHistory] = useState([]);
   const [loading, setLoading] = useState(false);
 
   // Connect wallet function
   const handleConnectWallet = async () => {
     try {
-      const { provider, signer, account } = await connectWallet();
-      setProvider(provider);
-      setSigner(signer);
-      setAccount(account);
+      const { account: addr, injector } = await connectWallet();
+      setAccount(addr);
+      setInjector(injector);
 
-      // Get contract instance
-      const contract = await getDiceGameContract(signer);
-      setContract(contract);
+      // Initialize contract
+      const ctr = await getDiceGameContract();
+      setContract(ctr);
 
       // Load game history
-      if (account) {
-        loadGameHistory(contract, account);
-      }
+      const history = await getPlayerHistory(ctr, addr);
+      setGameHistory(history);
     } catch (error) {
-      console.error("Error connecting wallet:", error);
-      alert("Failed to connect wallet. Please make sure MetaMask is installed and connected to the correct network.");
+      console.error('Error connecting wallet:', error);
+      alert('Failed to connect wallet. Ensure Polkadot extension is installed and on Westend.');
     }
   };
 
   // Load game history
-  const loadGameHistory = async (contract, account) => {
-    try {
-      const history = await contract.getPlayerHistory(account);
-      setGameHistory(history);
-    } catch (error) {
-      console.error("Error loading game history:", error);
-    }
-  };
+  // Removed in favor of getPlayerHistory from utils
 
   // Place bet function
   const placeBet = async (chosenNumber, betAmount) => {
-    if (!contract || !signer) {
-      alert("Please connect your wallet first");
-      return;
+    if (!contract || !injector || !account) {
+      alert('Please connect your wallet first');
+      return false;
     }
-
     try {
       setLoading(true);
-      const tx = await contract.placeBet(chosenNumber, {
-        value: ethers.utils.parseEther(betAmount.toString())
-      });
-      
-      // Wait for transaction to be mined
-      await tx.wait();
-      
-      // Reload game history
-      await loadGameHistory(contract, account);
+      const success = await sendBet(contract, account, injector, chosenNumber, betAmount);
+      if (success) {
+        const history = await getPlayerHistory(contract, account);
+        setGameHistory(history);
+      }
       setLoading(false);
-      
-      return true;
+      return success;
     } catch (error) {
-      console.error("Error placing bet:", error);
-      alert("Error placing bet. Please check your balance and try again.");
+      console.error('Error placing bet:', error);
+      alert('Error placing bet. Please check your balance and try again.');
       setLoading(false);
       return false;
     }

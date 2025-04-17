@@ -1,72 +1,148 @@
-import { ethers } from 'ethers';
+// Polkadot.js API integration for Westend network
+import { ApiPromise, WsProvider } from '@polkadot/api';
+import { ContractPromise } from '@polkadot/api-contract';
+import { web3Enable, web3Accounts, web3FromAddress } from '@polkadot/extension-dapp';
+import { formatBalance, BN } from '@polkadot/util';
 
-// ABI for the DiceGame contract
-const DiceGameABI = [
-  "function placeBet(uint8 chosenNumber) external payable",
-  "function getPlayerHistory(address player) external view returns (tuple(uint256 betAmount, uint8 chosenNumber, uint8 rolledNumber, uint256 payout, uint256 timestamp)[] memory)",
-  "function getContractBalance() external view returns (uint256)",
-  "function minBet() external view returns (uint256)",
-  "function maxBet() external view returns (uint256)",
-  "function houseEdge() external view returns (uint256)",
-  "event BetPlaced(address indexed player, uint256 amount, uint8 chosenNumber)",
-  "event DiceRolled(address indexed player, uint8 rolledNumber)",
-  "event PayoutSent(address indexed player, uint256 amount)"
-];
+// TODO: Place your Ink! contract metadata JSON at src/metadata/DiceGame.json
+import DiceGameMetadata from '../metadata/DiceGame.json';
 
-// Contract address - this would be updated after deployment
-const contractAddress = "0x0000000000000000000000000000000000000000";
+// Westend RPC endpoint
+const WS_PROVIDER = 'wss://westend-rpc.polkadot.io';
+// TODO: Replace with your deployed contract address on Westend
+const CONTRACT_ADDRESS = '5XXXX...';
 
-// Connect wallet function
-export const connectWallet = async () => {
-  if (!window.ethereum) {
-    throw new Error("No Ethereum wallet detected. Please install MetaMask.");
+let api;
+
+/**
+ * Initialize and return the ApiPromise instance
+ */
+export const initApi = async () => {
+  if (!api) {
+    const provider = new WsProvider(WS_PROVIDER);
+    api = await ApiPromise.create({ provider });
   }
-
-  await window.ethereum.request({ method: 'eth_requestAccounts' });
-  
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
-  const signer = provider.getSigner();
-  const account = await signer.getAddress();
-  
-  return { provider, signer, account };
+  return api;
 };
 
-// Get contract instance
-export const getDiceGameContract = async (signerOrProvider) => {
-  return new ethers.Contract(contractAddress, DiceGameABI, signerOrProvider);
+/**
+ * Connect to the Polkadot{.js} extension and return account/injector
+ */
+export const connectWallet = async () => {
+  const extensions = await web3Enable('Chainflip Casino');
+  if (extensions.length === 0) {
+    throw new Error('No Polkadot extension detected or access denied');
+  }
+  const accounts = await web3Accounts();
+  if (accounts.length === 0) {
+    throw new Error('No accounts found. Please authorize access in your extension.');
+  }
+  const { address } = accounts[0];
+  const injector = await web3FromAddress(address);
+  await initApi();
+  return { account: address, injector };
 };
 
-// Format ETH amount
-export const formatEth = (wei) => {
-  return parseFloat(ethers.utils.formatEther(wei)).toFixed(4);
+/**
+ * Return a ContractPromise instance for the DiceGame contract
+ */
+export const getDiceGameContract = async () => {
+  const _api = await initApi();
+  return new ContractPromise(_api, DiceGameMetadata, CONTRACT_ADDRESS);
 };
 
-// Listen for contract events
+/**
+ * Place a bet by sending an extrinsic to the contract
+ * @param {ContractPromise} contract
+ * @param {string} account
+ * @param {object} injector
+ * @param {number} chosenNumber
+ * @param {number} amount - in WND (Westend) units
+ */
+export const placeBet = async (contract, account, injector, chosenNumber, amount) => {
+  // Convert amount to planck (12 decimals)
+  const planckAmount = new BN(Math.floor(amount * 10 ** 12));
+  const gasLimit = -1; // auto weight
+  return new Promise(async (resolve, reject) => {
+    try {
+      const unsub = await contract.tx.placeBet({ gasLimit, value: planckAmount }, chosenNumber)
+        .signAndSend(account, { signer: injector.signer }, (result) => {
+          if (result.status.isInBlock || result.status.isFinalized) {
+            unsub();
+            resolve(true);
+          }
+        });
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
+/**
+ * Query on-chain player history
+ * @param {ContractPromise} contract
+ * @param {string} account
+ */
+export const getPlayerHistory = async (contract, account) => {
+  const options = { gasLimit: -1, value: 0 };
+  const { output } = await contract.query.getPlayerHistory(account, options, account);
+  if (!output) return [];
+  return output.map(([betAmount, chosenNumber, rolledNumber, payout, timestamp]) => ({
+    betAmount,
+    chosenNumber,
+    rolledNumber,
+    payout,
+    timestamp
+  }));
+};
+
+/**
+ * Format planck value to human-readable Westend (WND) string
+ */
+export const formatWND = (value) => {
+  return parseFloat(
+    formatBalance(value, { decimals: 12, withUnit: false })
+  ).toFixed(4);
+};
+
+/**
+ * Listen for contract events and invoke callback on matches
+ * @param {ContractPromise} contract
+ * @param {string} account
+ * @param {function} callback
+ * @returns {function} unsubscribe
+ */
 export const listenForEvents = (contract, account, callback) => {
-  // Listen for BetPlaced events
-  contract.on("BetPlaced", (player, amount, chosenNumber) => {
-    if (player.toLowerCase() === account.toLowerCase()) {
-      console.log("Bet placed:", { player, amount: formatEth(amount), chosenNumber });
-    }
-  });
+  const unsubs = [];
 
-  // Listen for DiceRolled events
-  contract.on("DiceRolled", (player, rolledNumber) => {
-    if (player.toLowerCase() === account.toLowerCase()) {
-      console.log("Dice rolled:", { player, rolledNumber });
-      callback && callback("rolled", { rolledNumber });
+  // BetPlaced(account, amount, chosenNumber)
+  const bp = contract.events.BetPlaced(({ args }) => {
+    const [player, amount, chosenNumber] = args;
+    if (player.toString() === account) {
+      callback('betPlaced', { amount: formatWND(amount), chosenNumber });
     }
   });
+  unsubs.push(bp);
 
-  // Listen for PayoutSent events
-  contract.on("PayoutSent", (player, amount) => {
-    if (player.toLowerCase() === account.toLowerCase()) {
-      console.log("Payout sent:", { player, amount: formatEth(amount) });
-      callback && callback("payout", { amount: formatEth(amount) });
+  // DiceRolled(account, rolledNumber)
+  const dr = contract.events.DiceRolled(({ args }) => {
+    const [player, rolledNumber] = args;
+    if (player.toString() === account) {
+      callback('rolled', { rolledNumber: rolledNumber.toNumber() });
     }
   });
+  unsubs.push(dr);
+
+  // PayoutSent(account, amount)
+  const ps = contract.events.PayoutSent(({ args }) => {
+    const [player, amount] = args;
+    if (player.toString() === account) {
+      callback('payout', { amount: formatWND(amount) });
+    }
+  });
+  unsubs.push(ps);
 
   return () => {
-    contract.removeAllListeners();
+    unsubs.forEach((u) => u && u());
   };
 };
