@@ -37,4 +37,7 @@ yarn.lock
 # Build outputs
 dist/
 build/
-out/ 
+out/
+
+# Environment variables
+.env 
